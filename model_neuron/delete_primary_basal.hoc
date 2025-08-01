@@ -1,0 +1,141 @@
+// Sequential deleting primary basal dendrites and their childs
+// Nassi, March 2015
+// This code is not used in the Petousakis et al., 2022 paper - it purely concerns the Park et al., 2019 paper.
+
+//Find primary dendrites. 
+objref list_primary[basal.count()]
+
+proc find_prim_dendrites () {
+	prim=0
+	for i=0, basal.count()-1 {
+		//If the parent node is the root (=> primary basal dendrite)
+		if (!basal.o(i).has_trueparent()) {
+			list_primary[prim]=new List()
+			basal.o(i).sec list_primary[prim].append(new SectionRef())
+			//If this dendrite has childs
+			if (basal.o(i).nchild()) {
+				for j=0, basal.o(i).nchild()-1 {
+					access basal.o(i).child[j] list_primary[prim].append(new SectionRef())
+				}
+			}
+			prim=prim+1
+		}
+	}
+}
+
+proc delete_primary_dendrites () {
+	dend_id11=$1
+	dend_id22=$2
+	if (list_primary[dend_id11].o(0).exists()) {
+		for j=0, list_primary[dend_id11].count()-1 {
+			access list_primary[dend_id11].o(j).sec 
+			delete_section()
+		}
+	}
+	if (dend_id22>dend_id11) {
+		if (list_primary[dend_id22].o(0).exists()) {
+			for j=0, list_primary[dend_id22].count()-1 {
+				access list_primary[dend_id22].o(j).sec 
+				delete_section()
+			}
+		}
+	}
+}
+
+proc delete_apical() {
+	for i=0, apical.count()-1 {
+			access apical.o(i).sec 
+			delete_section()
+	}
+}
+
+
+
+
+
+objref rand_id
+
+proc delete_primary_dendrites_rand () {
+	rand_id=new Random(num_seed)
+	num_of_dend=$1
+	rand_id.discunif(0, prim-1)
+	den_id1=rand_id.repick()
+	if (num_of_dend==2) {
+		dend_id22=rand_id.repick()
+		while (dend_id22==dend_id11) {
+			dend_id22=rand_id.repick()
+		}
+	}
+	if (num_of_dend==3) {
+		dend_id22=rand_id.repick()
+		while (dend_id22==dend_id11) {
+			dend_id22=rand_id.repick()
+		}
+		dend_id3=rand_id.repick()
+		while (dend_id3==dend_id11 || dend_id3==dend_id22) {
+			dend_id3=rand_id.repick()
+		}
+	}
+	if (num_of_dend==4) {
+		dend_id22=rand_id.repick()
+		while (dend_id22==dend_id11) {
+			dend_id22=rand_id.repick()
+		}
+		dend_id3=rand_id.repick()
+		while (dend_id3==dend_id11 || dend_id3==dend_id22) {
+			dend_id3=rand_id.repick()
+		}
+		dend_id4=rand_id.repick()
+		while (dend_id4==dend_id11 || dend_id4==dend_id22|| dend_id4==dend_id3) {
+			dend_id4=rand_id.repick()
+		}
+	}
+	if (list_primary[dend_id11].o(0).exists()) {
+		for j=0, list_primary[dend_id11].count()-1 {
+			access list_primary[dend_id11].o(j).sec 
+			delete_section()
+		}
+	}
+	if (num_of_dend==2) {
+		if (list_primary[dend_id22].o(0).exists()) {
+			for j=0, list_primary[dend_id22].count()-1 {
+				access list_primary[dend_id22].o(j).sec 
+				delete_section()
+			}
+		}
+	}
+	if (num_of_dend==3) {
+		if (list_primary[dend_id22].o(0).exists()) {
+			for j=0, list_primary[dend_id22].count()-1 {
+				access list_primary[dend_id22].o(j).sec 
+				delete_section()
+			}
+		}
+		if (list_primary[dend_id3].o(0).exists()) {
+			for j=0, list_primary[dend_id3].count()-1 {
+				access list_primary[dend_id3].o(j).sec 
+				delete_section()
+			}
+		}
+	}
+	if (num_of_dend==4) {
+		if (list_primary[dend_id22].o(0).exists()) {
+			for j=0, list_primary[dend_id22].count()-1 {
+				access list_primary[dend_id22].o(j).sec 
+				delete_section()
+			}
+		}
+		if (list_primary[dend_id3].o(0).exists()) {
+			for j=0, list_primary[dend_id3].count()-1 {
+				access list_primary[dend_id3].o(j).sec 
+				delete_section()
+			}
+		}
+		if (list_primary[dend_id4].o(0).exists()) {
+			for j=0, list_primary[dend_id4].count()-1 {
+				access list_primary[dend_id4].o(j).sec 
+				delete_section()
+			}
+		}
+	}
+}

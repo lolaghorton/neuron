@@ -1,0 +1,469 @@
+// Simulate stimulus, Papoutsi, 28/08/2014
+//Incorporation of tag picking from tagsyn.hoc (Petousakis)
+//----------------Declare objects
+//Spike trains
+objref Stim_basal[total_syn_basal+4],Stim_apical[total_syn_apic+10], vc_stim_apical[total_syn_apic+10], vc_stim_basal[total_syn_basal+4]
+//Stimulus synapses
+objref stim_apical_ampa[total_syn_apic+10], stim_apical_nmda[total_syn_apic+10]
+objref stim_basal_ampa[total_syn_basal+4], stim_basal_nmda[total_syn_basal+4]
+//NetCons
+objref nc_stim_apical_ampa[total_syn_apic+10], nc_stim_apical_nmda[total_syn_apic+10] 
+objref nc_stim_basal_ampa[total_syn_basal+4], nc_stim_basal_nmda[total_syn_basal+4]
+// Random generators Random location of synapses
+objref pstim, cut_off,s_time, basal_or
+//Vectors 
+objref activation_vec, X, sample, probs, mat_bas_st, mat_ap_st, tags_basal_syns[5], tag_dend_vec,tags_apical_syns, basaltags[7],apicaltags[43]
+//objref basalnames[7]
+
+//Synapses according to length
+mat_bas_st=new Vector()
+mat_ap_st=new Vector()
+tot_ap=0
+tot_bas=0
+
+//tvarn=0
+//tsumn=0
+
+for i=0, apical.count()-1 {tot_ap=tot_ap+apical.o(i).sec.L}
+for i=0, apical.count()-1 {
+	mat_ap_st.append(round((apical.o(i).sec.L/tot_ap)*total_syn_apic))
+	
+}
+for i=0, basal.count()-1 {tot_bas=tot_bas+basal.o(i).sec.L}
+//Re-arrange to be primary dendrite-specific
+for pd=0,4 {
+	for i=0, list_primary[pd].count()-1 {
+		mat_bas_st.append(round((list_primary[pd].o(i).sec.L/tot_bas)*total_syn_basal))
+	}	
+}
+
+//This bit rescales synapse counts on a specific dendrite.
+
+if(valcrit>-1 && valcrit<=6){
+	mat_bas_st.x(valcrit)=1*scalefactor  //dend[valcrit] now only has 1*scalefactor synapses
+	print "Basal ", valcrit, " stim-driven synapse count reduced to ", 1*scalefactor
+	for i=0,basal.count()-1{
+		if(i!=valcrit){
+			mat_bas_st.x(i)=0
+			print "Basal ",i," stim-driven synapses nullified."
+		}
+	}
+	for i=0,apical.count()-1{
+		mat_ap_st.x(i)=0
+		print "Apical ",i," stim-driven synapses nullified."
+	}
+}
+if(valcrit>-1 && valcrit>=7  && valcrit<50){
+	mat_ap_st.x(valcrit-7)=1*scalefactor //apic[valcrit] now only has 1*scalefactor synapses
+	print "Apical ", valcrit-7, " stim-driven synapse count reduced to ", 1*scalefactor
+	for i=0,apical.count()-1{
+		if(i!=valcrit-7){
+			mat_ap_st.x(i)=0
+			print "Apical ",i," stim-driven synapses nullified."
+		}
+	}
+	for i=0,basal.count()-1{
+		mat_bas_st.x(i)=0
+		print "Basal ",i," stim-driven synapses nullified."
+	}
+}
+if(valcrit==-1 || valcrit>49){
+	//print "Validation criterion exceeds singleton values (", valcrit,")"
+
+	if(valcrit>=50){
+		print "Validation criterion selects total synaptic rescaling according to scalefactor ", scalefactor
+		for i=0, apical.count()-1 {
+			mat_ap_st.x(i)=1*scalefactor
+		}
+		for i=0, basal.count()-1 {
+			mat_bas_st.x(i)=1*scalefactor
+		}
+	}
+	if(valcrit==-1){
+		print "Skipping numeric synaptic rescaling."
+	}
+}
+
+if (valcrit==-99){
+	print "Generating validation data for USDL"
+	for i=0, apical.count()-1 {
+			mat_ap_st.x(i)=0
+	}
+	for i=0, basal.count()-1 {
+		mat_bas_st.x(i)=0
+	}
+	if (val_bas != -1){
+		mat_bas_st.x(val_bas)=17
+	}
+	if (val_ap != -1){
+		mat_ap_st.x(val_ap)=17
+	}
+}
+
+
+//NetStim that drives stim-driven synapses, used to ascertain dendrite transfer function
+objref dvalstim
+dvalstim = new NetStim(0.5)
+dvalstim.interval=20
+dvalstim.number=2
+dvalstim.start=200
+dvalstim.noise=0
+if (valcrit == -99){
+	dvalstim.interval = 500
+	dvalstim.number = 5
+	dvalstim.start=100
+}
+
+//Make activation vector of each synapse activation
+activation_vec=new Vector()
+//activation_vec.append(0.1330,0.1258,0.1065,0.0807,0.0547,0.0332,0.0180,0.0089,0.0043,0.0030//,0.0043,0.0089,0.0180,0.0332,0.0547,0.0807,0.1065,0.1258,0.1330,0.1258//,0.1065,0.0807,0.0547,0.0332,0.0180,0.0089,0.0043,0.0030,0.0043, 0.0089//,0.0180,0.0332,0.0547,0.0807,0.1065,0.1258,0.1330) 
+activation_vec.append(0.9974,0.2487,0.0039,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0039,0.2487,0.9974,0.2487,0.0039,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0039,0.2487,0.9974)  
+//! Above: new activation values to ensure sharper and narrower tuning (8/5/17)
+//! 36 values (37,but 37th wraps around to the 1st, I assume) that correspond to all stimulus orientations and show the proportional response to each one.
+
+//-----------------------------------------------------Set variables/functions for synapse tags----------------------------------------------------------------//
+stmax=36  //Maximum number of different synaptic orientation preferences (tags). Algorithm has been tested for stmax up to 36.
+func gauss5pdf(){  //This function describes the probability distribution function (pdf) for our gaussian distribution. We are using a five-term equation, wrapped around the unit circle.
+		frac=(1/($1*sqrt(2*PI)))
+		e1=(exp(-0.5*(($2-$3-360)^2)/($1^2)))  //2k*pi = -360, k=-1
+		e2=(exp(-0.5*(($2-$3-180)^2)/($1^2)))  //2k*pi = -180, k=-0.5
+		e3=(exp(-0.5*(($2-$3)^2)/($1^2)))      //2k*pi = 0, k=0
+		e4=(exp(-0.5*(($2-$3+180)^2)/($1^2)))  //2k*pi = 180, k=0.5
+		e5=(exp(-0.5*(($2-$3+360)^2)/($1^2)))  //2k*pi = 360, k=1
+		prob=frac*(e1+e2+e3+e4+e5)  //This is a function of the synaptic tag ($2), and gives a probability value for every different tag.
+		return prob
+}
+//Make reference stimulus vector
+X=new Vector()
+for i=0,stmax-1 {X.append(i*10)}
+//-----------------------------------Stimulus procedure
+proc stimulus() {
+cut_off=new Random(num_seed2)	
+cut_off.uniform(0,1)
+s_time=new Random(num_seed)	
+basal_or=new Random(num_seed2-500000)	
+//Range of orientation preference in basal dendrites 
+basal_or.discunif((tag_basal/10)-disp, (tag_basal/10)+disp)
+
+tag_dend_vec=new Vector()
+syn=0
+c_d=-1
+enum=-1
+//For list of primary dendrites and their child-all will have the same mean orientation
+for pd=0,4 {
+	//Target orientation of this dendrite (and child)
+	tag_basal_dend=basal_or.repick()*10
+	if (tag_basal_dend<=-10) {tag_basal_dend=180+tag_basal_dend}
+	tag_dend_vec.append(tag_basal_dend)
+	// Fill in the probs and sums variables-arrays containing probability data.
+	objref probs
+	probs=new Vector()
+	sums=0
+	for k=0, stmax-1{  							//Iterates through all potential differences.
+		st=k*10 	
+		probs.append(gauss5pdf(basal_width,st,tag_basal_dend))  	//Calls gauss5pdf() to calculate all individual probabilities, then stores them.
+		sums=sums+probs.x(k) 						//Sums all individual probabilities and stores the sums.
+	}	
+	probs.div(sums)								//Normalize probabilities in 0-1 range
+	tags_basal_syns[pd]=new Vector()							
+	//For the basal dendrites of this branch (primary+child)
+	for bd=0, list_primary[pd].count()-1 {
+		enum=enum+1
+		basaltags[enum]=new Vector()
+		//basalnames[enum]=new Vector()
+		matchcount=0
+		c_d=c_d+1
+		while (matchcount<= mat_bas_st.x(c_d)-1) { 	  	
+								//For all the synapses in this dendrite
+			matched=0  				//While "matched" is 0, the algorithm keeps trying to find a match for a given synapse.
+			k=0  					//Variable to be used when iterating through all synaptic tags for a mc.
+			mc=cut_off.repick() 			//Pick new random comparison value in the interval 0-1 (inclusive).
+			while (matched==0){ 
+				if(k==0){  
+					rsum=probs.x(k)  //rsum is the sum of probabilities up to and including the current one.
+				}
+				if(k!=0){  //For all subsequent iterations.
+					rsum=rsum+probs.x(k)  //As above, rsum is the sum of probabilities up to and including the current one.
+				}
+				if (mc<=rsum){  	//The value of rsum is the end point for the normalized probability of the current synaptic tag - beyond it lies the probability for the next one. 
+					matched=1  	//As a match has been found, this breaks the inner loop, and returns to the outer loop.
+					tag_syn=k*10					
+					tags_basal_syns[pd].append(tag_syn)
+					basaltags[enum].append(tag_syn)  //for recording basal tags per basal dendrite
+					//basalnames[enum]=secname() //for recording basal tags per basal dendrite
+					//print "Basal tagging"
+					//print secname()
+					//Update this dendrite's and dendritic trees synapse counts
+					matchcount=matchcount+1
+					syn=syn+1
+					//Create stimulation train of the synapse
+					sample=new Vector()
+					sample=X.c
+					sample.sub(abs(tag_syn-stimulus_presentation))
+					sample.abs()
+					id=sample.min_ind()
+					p_Hz=activation_vec.x(id)*s_Hz
+					s_time.poisson(p_Hz/1000)
+					Stim_basal[syn-1]=new Vector()  //Stim_apical[matchcount-1]=new Vector()
+					for tt=0, stimulus_duration-1 {
+						if(s_time.repick()) {
+							Stim_basal[syn-1].append(tt)
+						}
+					}
+
+				}
+				if(mc>rsum){  	//If the comparison value does not fall within the (nsum1, nsum2) range, we have a negative match.
+					k=k+1  //Proceed to the next synaptic tag, as the one that was previously selected was not a match.
+				}
+			}
+		}
+	}
+}
+
+tags_apical_syns=new Vector()
+objref probs
+probs=new Vector()
+sums=0
+for k=0, stmax-1{  										
+	st=k*10 	
+	probs.append(gauss5pdf(apical_width,st, tag_apical))  	
+	sums=sums+probs.x(k) 						
+}	
+probs.div(sums)	
+
+syn=-1				
+for num=0, apical.count()-1 {
+	apicaltags[num] = new Vector()
+	//print num
+	matchcount=0
+	while (matchcount<=mat_ap_st.x(num)-1) {
+		matched=0  				
+		k=0  					
+		mc=cut_off.repick() 		
+		while(matched==0){ 
+			if(k==0){  
+				rsum=probs.x(k)  
+			}
+			if(k!=0){ 
+				rsum=rsum+probs.x(k)  
+			}
+			if(mc<=rsum){ 
+				syn=syn+1
+				matched=1  		
+				tag_syn=k*10					
+				tags_apical_syns.append(tag_syn)
+				apicaltags[num].append(tag_syn)  //used to record apical tags for each apical dendrite
+				//Update synapses
+				matchcount=matchcount+1
+				//Create stimulation of the synapse
+				sample=new Vector()
+				sample=X.c
+				sample.sub(abs(tag_syn-stimulus_presentation))
+				sample.abs()
+				id=sample.min_ind()
+				p_Hz=activation_vec.x(id)*s_Hz
+				s_time.poisson(p_Hz/1000)
+				//Stim_apical[matchcount-1]=new Vector()  //Stim_basal[syn-1]=new Vector()  
+				Stim_apical[syn]=new Vector()  //Stim_basal[syn-1]=new Vector()  
+				//print matchcount, " ", Stim_apical[matchcount-1]
+				for tt=0, stimulus_duration-1 {
+					if(s_time.repick()) {
+						Stim_apical[syn].append(tt)
+					}
+				}
+			}
+			if(mc>rsum){  	
+				k=k+1 
+			}
+		}
+	}
+}	
+print "Distribution of tags complete."
+pstim=new Random(num_seed2+400000)
+pstim.uniform(0,1)	
+//Connect basal synapses
+if (!nsB) {  //If nsB (no stim basal) is 1, then we don't want this part to execute, or an error might occur.
+	if (Bstim_ampaf!=1) {
+		print "Establishing basal connections with AMPA factor ",Bstim_ampaf," and NMDA factor ",Bstim_nmdaf
+	} else {
+		print "Establishing basal connections."
+	}
+	
+	syn=0
+	c_d=-1
+	for pd=0,4 {
+		for num=0, list_primary[pd].count()-1 {
+			c_d=c_d+1
+			ctrlflag=1
+			for i=0, mat_bas_st.x(c_d)-1 {
+				vc_stim_basal[syn] = new VecStim(0.5)
+				vc_stim_basal[syn].delay = 500
+				vc_stim_basal[syn].play(Stim_basal[syn])  
+				PID=pstim.repick()
+				list_primary[pd].o(num).sec stim_basal_ampa[syn]=new GLU(PID)
+				list_primary[pd].o(num).sec stim_basal_nmda[syn]=new nmda(PID)
+				//added for troubleshooting purposes
+				if (!cut_basal) {
+					if(pd==0 && flagSD==1){
+						nc_stim_basal_ampa[syn] = new NetCon(vc_stim_basal[syn], stim_basal_ampa[syn], -20, 0, ampa_g*0)
+						nc_stim_basal_nmda[syn] = new NetCon(vc_stim_basal[syn], stim_basal_nmda[syn], -20, 0, nmda_g*0)
+						//print "in flagged (stim) ", pd
+					}
+					if(pd!=0 || flagSD==0){
+						nc_stim_basal_ampa[syn] = new NetCon(vc_stim_basal[syn], stim_basal_ampa[syn], -20, 0, ampa_g*Bstim_ampaf)
+						nc_stim_basal_nmda[syn] = new NetCon(vc_stim_basal[syn], stim_basal_nmda[syn], -20, 0, nmda_g*Bstim_nmdaf)
+						//print "in non-flagged (stim) ", pd
+					}
+				} else if (pd!=dend_id1 && pd!=dend_id2) {
+					nc_stim_basal_ampa[syn] = new NetCon(vc_stim_basal[syn], stim_basal_ampa[syn], -20, 0, ampa_g*Bstim_ampaf)
+					nc_stim_basal_nmda[syn] = new NetCon(vc_stim_basal[syn], stim_basal_nmda[syn], -20, 0, nmda_g*Bstim_nmdaf)
+				}
+				syn=syn+1   
+			}
+		}
+	}
+}
+print "Basal connections established."
+
+if (!nsA) {   //If nsA (no stim apical) is 1, then we don't want this part to execute, or an error might occur.
+	if (Astim_ampaf!=1) {
+		print "Establishing apical connections with AMPA factor ",Astim_ampaf," and NMDA factor ",Astim_nmdaf
+	} else {
+		print "Establishing apical connections."
+	}
+	syn=-1
+	for num=0, apical.count()-1 {
+		ctrlflag=1
+		for i=0, mat_ap_st.x(num)-1 {  //! must change to -2 to work when increasing synaptic counts ?!?!?! Otherwise the last synapse does not register!
+			syn=syn+1
+			vc_stim_apical[syn] = new VecStim(0.5) 
+			//print vc_stim_apical[syn]                                                               
+			vc_stim_apical[syn].delay = 500
+			//print vc_stim_apical[syn].delay  
+			//print Stim_apical[syn], " ", syn, " ",num
+			vc_stim_apical[syn].play(Stim_apical[syn]) 
+		
+			PID=pstim.repick()
+
+			apical.o(num).sec stim_apical_ampa[syn]=new GLU(PID)
+			apical.o(num).sec stim_apical_nmda[syn]=new nmda(PID)
+			if (!ablated) {
+				nc_stim_apical_ampa[syn] = new NetCon(vc_stim_apical[syn], stim_apical_ampa[syn], -20, delFB_stim_exc, ampa_g*Astim_ampaf)  //applied delay
+				//print "-ampa"
+				print "Apical stim-driven synapse", syn, " features ",nc_stim_apical_ampa[syn].delay, " ms delay"
+				nc_stim_apical_nmda[syn] = new NetCon(vc_stim_apical[syn], stim_apical_nmda[syn], -20, delFB_stim_exc, nmda_g*Astim_nmdaf)  //applied delay
+				//print "-nmda"
+			}
+		
+		}
+	}
+}
+print "Apical connections established."
+
+// Output synapse numbers
+sstimB=0
+sstimA=0
+for i=0,6{
+	sstimB+=mat_bas_st.x(i)
+	print "Basal ",i, " receives ", mat_bas_st.x(i), " stim-driven excitatory synapses."
+}
+for i=0,42{
+	sstimA+=mat_ap_st.x(i)
+	print "Apical ",i, " receives ", mat_ap_st.x(i), " stim-driven excitatory synapses."
+}
+print "Actual stim-driven synaptic counts:"
+print "Basal: ", sstimB, "(defined as ", total_syn_basal," )"
+print "Apical: ", sstimA, "(defined as ", total_syn_apic," )"
+
+
+if(valcrit>-1){
+	syn=-1
+	for num=0, apical.count()-1 {
+		ctrlflag=1
+		for i=0, mat_ap_st.x(num)-1 { 
+			if(num==valcrit-7){
+				syn=syn+1
+				//PID=pstim.repick()  //changed to completely uniform distribution
+				j = i+1
+				inter_stim_distance = 1/(mat_ap_st.x(num)+1)
+				PID = j * inter_stim_distance
+				apical.o(num).sec stim_apical_ampa[syn]=new GLU(PID)
+				apical.o(num).sec stim_apical_nmda[syn]=new nmda(PID)
+				if(ctrlflag==1){
+					print "Apical dendrite ",num," to receive validation stim train on ",mat_ap_st.x(num)," synapses. ISD=",inter_stim_distance
+					ctrlflag=0
+				}
+				nc_stim_apical_ampa[syn] = new NetCon(dvalstim, stim_apical_ampa[syn], -20, 0, ampa_g)
+				nc_stim_apical_nmda[syn] = new NetCon(dvalstim, stim_apical_nmda[syn], -20, 0, nmda_g)
+			}
+		
+		}
+	}
+
+	syn=-1
+	for num=0, basal.count()-1 {
+		ctrlflag=1
+		for i=0, mat_bas_st.x(num)-1 { 
+			if(num==valcrit){
+				syn=syn+1
+				//PID=pstim.repick()  //changed to completely uniform distribution
+				j = i+1
+				inter_stim_distance = 1/(mat_bas_st.x(num)+1)
+				PID = j * inter_stim_distance
+				basal.o(num).sec stim_basal_ampa[syn]=new GLU(PID)
+				basal.o(num).sec stim_basal_nmda[syn]=new nmda(PID)
+				if(ctrlflag==1){
+					print "Basal dendrite ",num," to receive validation stim train on ",mat_bas_st.x(num)," synapses. ISD=",inter_stim_distance
+					ctrlflag=0
+				}
+				nc_stim_basal_ampa[syn] = new NetCon(dvalstim, stim_basal_ampa[syn], -20, 0, ampa_g)
+				nc_stim_basal_nmda[syn] = new NetCon(dvalstim, stim_basal_nmda[syn], -20, 0, nmda_g)
+			}
+		
+		}
+	}
+}
+
+if(valcrit==-99){
+	syn=-1
+	for num=0, apical.count()-1 {
+		ctrlflag=1
+		for i=0, mat_ap_st.x(num)-1 { 
+			if(mat_ap_st.x(num) != 0){
+				syn=syn+1
+				PID=pstim.repick()
+				apical.o(num).sec stim_apical_ampa[syn]=new GLU(PID)
+				apical.o(num).sec stim_apical_nmda[syn]=new nmda(PID)
+				if(ctrlflag==1){
+					print "Apical dendrite ",num," to receive validation stim train on ",mat_ap_st.x(num)," synapses."
+					ctrlflag=0
+				}
+				nc_stim_apical_ampa[syn] = new NetCon(dvalstim, stim_apical_ampa[syn], -20, 0, ampa_g)
+				nc_stim_apical_nmda[syn] = new NetCon(dvalstim, stim_apical_nmda[syn], -20, 0, nmda_g)
+			}
+		}
+	}
+
+	syn=-1
+	for num=0, basal.count()-1 {
+		ctrlflag=1
+		for i=0, mat_bas_st.x(num)-1 { 
+			if(mat_bas_st.x(num) != 0){
+				syn=syn+1
+				PID=pstim.repick()
+				basal.o(num).sec stim_basal_ampa[syn]=new GLU(PID)
+				basal.o(num).sec stim_basal_nmda[syn]=new nmda(PID)
+				if(ctrlflag==1){
+					print "Basal dendrite ",num," to receive validation stim train on ",mat_bas_st.x(num)," synapses."
+					ctrlflag=0
+				}
+				nc_stim_basal_ampa[syn] = new NetCon(dvalstim, stim_basal_ampa[syn], -20, 0, ampa_g)
+				nc_stim_basal_nmda[syn] = new NetCon(dvalstim, stim_basal_nmda[syn], -20, 0, nmda_g)
+			}
+		}
+	}
+}
+
+}
+
+
