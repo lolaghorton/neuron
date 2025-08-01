@@ -1,0 +1,99 @@
+//Nullify inhibition
+func nullinh(){
+	//Synapse Count Nullification
+	//Works in conjunction with if statements in the VecStim code (stimulus_uniform_basalvar and background_uniform)
+	if($1==1){
+		syn_inh_soma=0
+		print "Nullified somatic inhibition."
+	}
+	if($2==1){
+		syn_inh_basal=0
+		print "Nullified basal inhibition."
+	}
+	if($3==1 && !ablated){
+		syn_inh_apical=0
+		print "Nullified apical inhibition."
+	}
+	return 1
+}
+
+//Nullify excitation (stim-driven)
+func nullstim(){
+	//Synapse Count Nullification
+	//Works in conjunction with if statements in the VecStim code (stimulus_uniform_basalvar and background_uniform)
+	if($1==1){
+		total_syn_basal=0
+		print "Nullified stim-driven basal excitation."
+	}
+	if($2==1 && !ablated){
+		total_syn_apic=0
+		print "Nullified stim-driven apical excitation."
+	}
+	return 1
+}
+
+//Nullify excitation (background)
+func nullbg(){
+	//Synapse Count Nullification
+	//Works in conjunction with if statements in the VecStim code (stimulus_uniform_basalvar and background_uniform)
+	if($1==1){
+		syn_basal=0
+		print "Nullified background basal excitation."
+	}
+	if($2==1 && !ablated){
+		syn_apical=0
+		print "Nullified background apical excitation."
+	}
+	/*syn_exc_total=1
+	syn_exc=1
+	syn_basal=1
+	syn_apical=1*/
+
+	return 1
+}
+
+//TTX-like protocol - nullify sodium channel conductance for selected areas.
+//3 arguments, for soma, basal, apical sections. 0 leaves the section unaffected, 1 applies TTX to it.
+func ttx(){ 
+	if($1==1){
+		j=1
+		for i=0, somatic.count()-1 {
+			access somatic.o(i).sec
+			for(x){	
+				gbar_na=0 
+				j=j+1
+			}
+			if(i==somatic.count()-1){
+				print "Somatic sodium channels disabled."," #", j-1
+			} 
+		}
+	}
+	if($2==1){
+		j=1
+		for i=0, basal.count()-1 {
+			access basal.o(i).sec
+			for(x){	
+				gbar_na=0 
+				j=j+1
+			}
+			if(i==basal.count()-1){
+				print "Basal dendrite sodium channels disabled."," #", j-1
+			} 
+		}
+	}
+	if($3==1 && !ablated){
+		j=1
+		for i=0, apical.count()-1 {
+			access apical.o(i).sec
+			for(x){	
+				gbar_na=0 
+				j=j+1
+			}
+			if(i==apical.count()-1){
+				print "Apical dendrite sodium channels disabled.", " #", j-1
+			} 
+		}
+	}
+	return 3
+}
+
