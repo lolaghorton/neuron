@@ -1,0 +1,11 @@
+name: horton2025
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - matplotlib
+  - scipy
+  - numpy
+  - pip
+  - pandas
+  - scikit-learn
